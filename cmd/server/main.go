@@ -18,12 +18,10 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte("welcome"))
-		if err != nil {
-			log.Printf("Error writing response: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
+	r.Get("/{city}", func(w http.ResponseWriter, r *http.Request) {
+		city := chi.URLParam(r, "city")
+
+		fmt.Printf("Received request for city: %s\n", city)
 	})
 
 	s, err := gocron.NewScheduler()
