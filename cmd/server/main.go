@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/Fteeliy/weather-service/internal/client/http/geocoding"
+	openmeteo "github.com/Fteeliy/weather-service/internal/client/http/open_meteo"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -18,10 +22,35 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
+	geocodingClient := geocoding.NewClient(&http.Client{Timeout: 10 * time.Second})
+	openMeteoClient := openmeteo.NewClient(&http.Client{Timeout: 10 * time.Second})
+
 	r.Get("/{city}", func(w http.ResponseWriter, r *http.Request) {
 		city := chi.URLParam(r, "city")
 
-		fmt.Printf("Received request for city: %s\n", city)
+		geoRes, err := geocodingClient.GetCoords(city)
+		if err != nil {
+			http.Error(w, "Failed to get coordinates", http.StatusInternalServerError)
+			return
+		}
+
+		openMeteoRes, err := openMeteoClient.GetTemperature(geoRes.Latitude, geoRes.Longitude)
+		if err != nil {
+			http.Error(w, "Failed to get temperature", http.StatusInternalServerError)
+			return
+		}
+
+		raw, err := json.Marshal(openMeteoRes)
+		if err != nil {
+			http.Error(w, "Failed to marshal response", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = w.Write(raw)
+		if err != nil {
+			http.Error(w, "Failed to write response", http.StatusInternalServerError)
+			return
+		}
 	})
 
 	s, err := gocron.NewScheduler()
